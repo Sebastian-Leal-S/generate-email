@@ -1,16 +1,724 @@
 ---
+// src/pages/index.astro
+// Editor de reporte de robots: formulario por filas -> tabla HTML con estilos en línea.
 ---
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Generador de correo</title>
+    <!-- is:global: las tarjetas se crean con JS, así que el CSS "con alcance" de Astro no les llegaría -->
+    <style is:global>
+      :root {
+        --bg: #f6f7f9;
+        --panel: #ffffff;
+        --soft: #f9fafb;
+        --line: #d9dde3;
+        --text: #1d2430;
+        --muted: #667085;
+        --accent: #4472c4;
+        --danger: #b42318;
+        --danger-bg: #fef3f2;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        color: var(--text);
+        background: var(--bg);
+      }
+      main {
+        display: grid;
+        grid-template-columns: minmax(340px, 480px) 1fr;
+        gap: 20px;
+        padding: 20px;
+        min-height: 100vh;
+        align-items: start;
+      }
+      @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+      section {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 16px;
+      }
 
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
+      /* Encabezado de sección */
+      .section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      h2 { font-size: 16px; margin: 0; display: flex; align-items: center; gap: 8px; }
+      .count {
+        font-size: 12px; font-weight: 600; color: var(--muted);
+        background: #eef0f3; border-radius: 999px; padding: 2px 8px;
+      }
+      .head-actions { display: flex; gap: 6px; }
+
+      /* Campos */
+      .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+      .field > span { font-size: 12px; font-weight: 600; color: var(--muted); }
+      input, select, textarea {
+        width: 100%;
+        font: inherit;
+        font-size: 14px;
+        padding: 8px 10px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: #fff;
+        color: var(--text);
+      }
+      input:hover, select:hover, textarea:hover { border-color: #b9c0cb; }
+      textarea { resize: vertical; min-height: 84px; max-height: 320px; line-height: 1.45; }
+      input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+      }
+      .select-wrap { position: relative; }
+      .select-wrap .dot { position: absolute; left: 11px; top: 50%; margin-top: -4px; pointer-events: none; }
+      .select-wrap select { padding-left: 28px; }
+      .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; display: inline-block; }
+
+      /* Botones */
+      button {
+        font: inherit;
+        font-size: 13px;
+        padding: 6px 12px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: #fff;
+        color: var(--text);
+        cursor: pointer;
+      }
+      button:hover { background: #f0f2f5; }
+      button:disabled { opacity: .45; cursor: not-allowed; background: #fff; }
+      button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+      button.primary:hover { background: #3a64ac; }
+      button.danger { color: var(--danger); }
+      button.danger:hover { background: var(--danger-bg); border-color: #fda29b; }
+      button.link-btn { border: none; background: none; color: var(--accent); padding: 4px 6px; }
+      button.link-btn:hover { background: #eef3fb; }
+      button.add-btn {
+        width: 100%; margin-top: 12px; padding: 11px; font-size: 14px;
+        border-style: dashed; color: var(--muted);
+      }
+      button.add-btn:hover { color: var(--accent); border-color: var(--accent); background: #f5f8fd; }
+
+      /* Ayuda y avisos */
+      .hint { font-size: 12px; color: var(--muted); margin: 0 0 10px; line-height: 1.5; }
+      .hint code { background: #eef0f3; padding: 1px 5px; border-radius: 4px; }
+      .list-tools { display: flex; justify-content: flex-end; gap: 2px; margin-bottom: 8px; }
+      .notice {
+        display: flex; align-items: center; justify-content: space-between; gap: 8px;
+        background: var(--text); color: #fff; border-radius: 6px;
+        padding: 7px 8px 7px 12px; font-size: 13px; margin-bottom: 12px;
+      }
+      .notice[hidden] { display: none; }
+      .notice button { background: transparent; color: #fff; border-color: rgba(255,255,255,.4); padding: 4px 10px; }
+      .notice button:hover { background: rgba(255,255,255,.12); }
+      .empty { text-align: center; color: var(--muted); font-size: 14px; padding: 24px 0 8px; margin: 0; }
+
+      /* Tarjeta de robot */
+      .cards { display: flex; flex-direction: column; gap: 12px; }
+      .card { border: 1px solid var(--line); border-radius: 8px; background: #fff; overflow: hidden; }
+      .card-head {
+        display: flex; align-items: center; gap: 8px;
+        padding: 4px 12px 4px 4px; background: var(--soft); border-bottom: 1px solid var(--line);
+      }
+      .card.collapsed .card-head { border-bottom: none; }
+      button.toggle {
+        flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px;
+        border: none; background: transparent; padding: 8px; text-align: left;
+        font-size: 14px; font-weight: 700;
+      }
+      button.toggle:hover { background: transparent; }
+      .chev { display: inline-block; width: 14px; color: var(--muted); font-size: 12px; transition: transform .15s; }
+      .card.collapsed .chev { transform: rotate(-90deg); }
+      .name-preview {
+        display: none; min-width: 0; font-weight: 400; color: var(--muted);
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .card.collapsed .name-preview { display: block; }
+      .chip {
+        display: inline-flex; align-items: center; gap: 6px; flex: none;
+        font-size: 12px; font-weight: 600; padding: 3px 10px;
+        border-radius: 999px; background: #fff; border: 1px solid var(--line); white-space: nowrap;
+      }
+      .card-body { padding: 14px 14px 2px; }
+      .card-actions {
+        display: flex; justify-content: space-between; gap: 8px;
+        padding: 10px 14px; border-top: 1px solid var(--line); background: var(--soft);
+      }
+      .card-actions .group { display: flex; gap: 6px; }
+      .card.collapsed .card-body, .card.collapsed .card-actions { display: none; }
+
+      /* Bloques de texto plegables (arriba / abajo de la tabla) */
+      details.text-block {
+        border: 1px solid var(--line); border-radius: 8px; background: #fff;
+        margin-bottom: 10px; overflow: hidden;
+      }
+      details.text-block summary {
+        display: flex; align-items: center; gap: 8px; list-style: none; cursor: pointer;
+        padding: 10px 12px; background: var(--soft); font-size: 13px; font-weight: 700;
+      }
+      details.text-block summary::-webkit-details-marker { display: none; }
+      details.text-block summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+      details.text-block[open] summary { border-bottom: 1px solid var(--line); }
+      details.text-block:not([open]) .chev { transform: rotate(-90deg); }
+      details.text-block .sum-preview {
+        min-width: 0; font-weight: 400; color: var(--muted);
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      details.text-block[open] .sum-preview { display: none; }
+      details.text-block .text-body { padding: 12px; }
+      details.text-block textarea { min-height: 96px; }
+
+      /* Vista previa */
+      .bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+      #preview-wrap { overflow-x: auto; border: 1px dashed var(--line); border-radius: 6px; padding: 12px; background: #fff; }
+      #status-msg { font-size: 13px; color: #2e7d32; min-height: 1em; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section>
+        <div class="section-head">
+          <h2>Robots <span id="count" class="count">0</span></h2>
+          <div class="head-actions">
+            <button id="import" type="button">Importar</button>
+            <button id="export" type="button">Exportar</button>
+            <input id="import-file" type="file" accept=".json,application/json" hidden />
+          </div>
+        </div>
+
+        <label class="field">
+          <span>Título de la tabla</span>
+          <input id="titulo" placeholder="Ej. ESTATUS DIARIO DE BOTS PRODUCTIVOS" />
+        </label>
+
+        <details class="text-block">
+          <summary>
+            <span class="chev" aria-hidden="true">▾</span>
+            <span>Texto superior</span>
+            <span class="sum-preview" id="intro-preview"></span>
+          </summary>
+          <div class="text-body">
+            <textarea id="intro" aria-label="Texto superior (antes de la tabla)" placeholder="Saludo e introducción que aparecen antes de la tabla"></textarea>
+          </div>
+        </details>
+
+        <details class="text-block">
+          <summary>
+            <span class="chev" aria-hidden="true">▾</span>
+            <span>Texto inferior</span>
+            <span class="sum-preview" id="outro-preview"></span>
+          </summary>
+          <div class="text-body">
+            <textarea id="outro" aria-label="Texto inferior (después de la tabla)" placeholder="Cierre o despedida que aparece después de la tabla"></textarea>
+          </div>
+        </details>
+
+        <p class="hint">
+          En comentarios y textos usa <code>- texto</code> para viñetas, <code>1. texto</code> para lista
+          numerada, o escribe texto normal. Una línea en blanco separa los bloques.
+        </p>
+
+        <div id="notice" class="notice" role="status" hidden>
+          <span id="notice-text"></span>
+          <button id="undo" type="button">Deshacer</button>
+        </div>
+
+        <div class="list-tools">
+          <button id="collapse-all" class="link-btn" type="button">Contraer todo</button>
+          <button id="expand-all" class="link-btn" type="button">Expandir todo</button>
+        </div>
+
+        <div id="rows" class="cards"></div>
+        <button id="add" class="add-btn" type="button">+ Agregar robot</button>
+      </section>
+
+      <section>
+        <div class="section-head"><h2>Vista previa</h2></div>
+        <div class="bar">
+          <button id="copy" class="primary" type="button">Copiar para Gmail</button>
+          <button id="copy-code" type="button">Copiar código HTML</button>
+          <span id="status-msg" role="status"></span>
+        </div>
+        <div id="preview-wrap"><div id="preview"></div></div>
+      </section>
+    </main>
+
+    <script>
+      type Row = { nombre: string; estatus: string; comentario: string };
+
+      // Estatus disponibles y su color. Edita esta lista a tu gusto.
+      const ESTATUS: Record<string, string> = {
+        Activo: 'rgb(106,168,79)',
+        Apagado: '#C00000',
+        'En pausa': '#ED7D31',
+        Advertencia: '#BF9000',
+        Inactivo: '#7F7F7F',
+        Estabilización: '#7F7F7F',
+      };
+
+      let titulo = 'ESTATUS DIARIO DE BOTS PRODUCTIVOS';
+      let intro =
+        'Buen día equipo.\nEl presente correo es para notificar el estado de salud de los robots para las ejecuciones de hoy al inicio del día.\nA continuación, les presentamos el detalle para cada uno de los procesos.';
+      let outro = 'Cualquier duda o comentario, no duden en contactarnos.';
+
+      const rows: Row[] = [
+        {
+          nombre: 'Nombre Robot',
+          estatus: 'Activo',
+          comentario:
+            'Sección de comentarios',
+        },
+      ];
+
+      const esc = (s: string) =>
+        s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+      // ---------- Comentarios estilo Markdown ----------
+      // "- texto" o "* texto"  -> lista con viñetas
+      // "1. texto" o "1) texto" -> lista numerada
+      // cualquier otra línea    -> párrafo
+      // Las líneas consecutivas del mismo tipo se agrupan en una sola lista.
+      function commentToHtml(text: string, gap = 6): string {
+        const out: string[] = [];
+        let listTag: 'ul' | 'ol' | null = null;
+        let items: string[] = [];
+
+        const flush = () => {
+          if (!listTag) return;
+          out.push(
+            `<${listTag} style="margin:0 0 ${gap}px;padding-left:22px;">${items.join('')}</${listTag}>`
+          );
+          listTag = null;
+          items = [];
+        };
+
+        for (const raw of text.split('\n')) {
+          const line = raw.trim();
+          if (!line) {
+            flush();
+            continue;
+          }
+          const bullet = line.match(/^[-*]\s+(.*)$/);
+          const number = line.match(/^\d+[.)]\s+(.*)$/);
+
+          if (bullet || number) {
+            const tag = bullet ? 'ul' : 'ol';
+            if (listTag !== tag) {
+              flush();
+              listTag = tag;
+            }
+            items.push(`<li style="margin:0 0 3px;">${esc((bullet ?? number)![1])}</li>`);
+          } else {
+            flush();
+            out.push(`<p style="margin:0 0 ${gap}px;">${esc(line)}</p>`);
+          }
+        }
+        flush();
+        return out.join('');
+      }
+
+      // ---------- Generador de HTML (todo con estilos en línea) ----------
+      function buildHtml(data: Row[]): string {
+        const BORDER_ROW =
+          'border-width:medium medium 1pt;border-style:none none dotted;border-color:currentcolor currentcolor rgb(191,191,191);padding:5px';
+        const HEAD = 'color:rgb(46,117,182)';
+
+        // Celda del componente de fila (con alineación vertical arriba)
+        const cell = (px: number, pt: string, inner: string) =>
+          `<td width="${px}" style="width:${pt}pt;${BORDER_ROW};vertical-align:top">${inner}</td>`;
+
+        const body = data
+          .map((r, i) => {
+            const color = ESTATUS[r.estatus] ?? '#333333';
+            return `<tr>
+${cell(52, '39', `<b>${i + 1}.</b>`)}
+${cell(411, '308.3', `<b>${esc(r.nombre)}</b>`)}
+${cell(132, '99.25', `<b style="color:${color}">${esc(r.estatus)}</b>`)}
+${cell(539, '403.95', commentToHtml(r.comentario))}
+</tr>`;
+          })
+          .join('\n');
+
+        // Componente de tabla: título + encabezados + filas
+        const table = `<table border="0" cellspacing="0" cellpadding="0" width="1134" style="width:100%;font-family:Arial,sans-serif;font-size:13px;border-width:medium medium 4.5pt;border-style:none none solid;border-color:currentcolor currentcolor rgb(46,116,181)">
+<tbody>
+<tr>
+<td colspan="4" valign="top" style="border-width:medium medium 4.5pt;border-style:none none solid;border-color:currentcolor currentcolor rgb(46,116,181);padding:8px;text-align:center"><b style="font-family:Arial,sans-serif;color:rgb(46,117,182);font-size:15px">${esc(titulo)}</b></td>
+</tr>
+<tr>
+<td width="52" style="width:39pt;${BORDER_ROW}"></td>
+<td width="411" style="width:308.3pt;${BORDER_ROW};text-align:center"><b style="${HEAD}">ROBOT</b></td>
+<td width="132" style="width:99.25pt;${BORDER_ROW}"><b style="${HEAD}">ESTATUS</b></td>
+<td width="539" style="width:403.95pt;${BORDER_ROW}"><b style="${HEAD}">COMENTARIO</b></td>
+</tr>
+${body}
+</tbody>
+</table>`;
+
+        // Texto superior e inferior (mismo Arial 13px que la tabla)
+        const textBlock = (t: string, margin: string) => {
+          const inner = commentToHtml(t, 10);
+          return inner
+            ? `<div style="font-family:Arial,sans-serif;font-size:13px;margin:${margin}">${inner}</div>`
+            : '';
+        };
+        const top = textBlock(intro, '0 0 6px');
+        const bottom = textBlock(outro, '16px 0 0');
+        return [top, table, bottom].filter(Boolean).join('\n');
+      }
+
+      // ---------- Formulario ----------
+      const rowsEl = document.querySelector<HTMLDivElement>('#rows')!;
+      const previewEl = document.querySelector<HTMLDivElement>('#preview')!;
+      const msgEl = document.querySelector<HTMLSpanElement>('#status-msg')!;
+
+      const renderPreview = () => {
+        previewEl.innerHTML = buildHtml(rows);
+      };
+
+      const countEl = document.querySelector<HTMLSpanElement>('#count')!;
+      const noticeEl = document.querySelector<HTMLDivElement>('#notice')!;
+      const noticeText = document.querySelector<HTMLSpanElement>('#notice-text')!;
+
+      // Tarjetas contraídas (por objeto, así sobreviven a reordenar)
+      const collapsed = new WeakSet<Row>();
+      const colorOf = (s: string) => ESTATUS[s] ?? '#333333';
+
+      // Ajusta el alto del textarea a su contenido (ignora tarjetas ocultas)
+      function autoGrow(t: HTMLTextAreaElement) {
+        if (!t.offsetParent) return;
+        t.style.height = 'auto';
+        t.style.height = Math.min(t.scrollHeight + 2, 320) + 'px';
+      }
+
+      // Aviso con "Deshacer" al eliminar
+      let lastDeleted: { row: Row; index: number } | null = null;
+      let noticeTimer: number | undefined;
+      function hideNotice() {
+        noticeEl.hidden = true;
+        lastDeleted = null;
+      }
+      function showNotice(text: string) {
+        noticeText.textContent = text;
+        noticeEl.hidden = false;
+        clearTimeout(noticeTimer);
+        noticeTimer = window.setTimeout(hideNotice, 8000);
+      }
+      document.querySelector('#undo')!.addEventListener('click', () => {
+        if (!lastDeleted) return;
+        const { row, index } = lastDeleted;
+        rows.splice(Math.min(index, rows.length), 0, row);
+        hideNotice();
+        renderForm({ row, a: 'nombre' });
+        renderPreview();
+      });
+
+      function renderForm(focus?: { row: Row; a: string }) {
+        rowsEl.innerHTML = '';
+        countEl.textContent = String(rows.length);
+
+        if (rows.length === 0) {
+          rowsEl.innerHTML = '<p class="empty">No hay robots. Agrega uno para empezar.</p>';
+          return;
+        }
+
+        rows.forEach((r, i) => {
+          const el = document.createElement('article');
+          el.className = 'card' + (collapsed.has(r) ? ' collapsed' : '');
+          el.innerHTML = `
+            <header class="card-head">
+              <button type="button" class="toggle" data-a="toggle" aria-expanded="${!collapsed.has(r)}">
+                <span class="chev" aria-hidden="true">▾</span>
+                <span>Robot ${i + 1}</span>
+                <span class="name-preview"></span>
+              </button>
+              <span class="chip"><i class="dot"></i><span class="chip-text"></span></span>
+            </header>
+
+            <div class="card-body">
+              <label class="field">
+                <span>Nombre</span>
+                <input data-f="nombre" placeholder="Ej. Remesas 1 - Conciliación de Remesas" />
+              </label>
+              <label class="field">
+                <span>Estatus</span>
+                <div class="select-wrap">
+                  <i class="dot"></i>
+                  <select data-f="estatus">
+                    ${Object.keys(ESTATUS)
+                      .map((s) => `<option value="${esc(s)}">${esc(s)}</option>`)
+                      .join('')}
+                  </select>
+                </div>
+              </label>
+              <label class="field">
+                <span>Comentarios</span>
+                <textarea data-f="comentario" placeholder="- Primera viñeta&#10;- Segunda viñeta"></textarea>
+              </label>
+            </div>
+
+            <footer class="card-actions">
+              <div class="group">
+                <button type="button" data-a="up" ${i === 0 ? 'disabled' : ''}>↑ Subir</button>
+                <button type="button" data-a="down" ${i === rows.length - 1 ? 'disabled' : ''}>↓ Bajar</button>
+              </div>
+              <div class="group">
+                <button type="button" data-a="dup">Duplicar</button>
+                <button type="button" data-a="del" class="danger">Eliminar</button>
+              </div>
+            </footer>`;
+
+          const q = <T extends Element>(sel: string) => el.querySelector<T>(sel)!;
+          const nameIn = q<HTMLInputElement>('[data-f="nombre"]');
+          const sel = q<HTMLSelectElement>('[data-f="estatus"]');
+          const ta = q<HTMLTextAreaElement>('[data-f="comentario"]');
+          const chipDot = q<HTMLElement>('.chip .dot');
+          const chipText = q<HTMLElement>('.chip-text');
+          const selDot = q<HTMLElement>('.select-wrap .dot');
+          const preview = q<HTMLElement>('.name-preview');
+          const toggleBtn = q<HTMLButtonElement>('[data-a="toggle"]');
+
+          const paintStatus = () => {
+            const c = colorOf(r.estatus);
+            chipDot.style.background = c;
+            selDot.style.background = c;
+            chipText.textContent = r.estatus;
+          };
+          const paintName = () => (preview.textContent = r.nombre || 'Sin nombre');
+
+          // Valores iniciales (por propiedad, para evitar problemas de escape)
+          nameIn.value = r.nombre;
+          sel.value = r.estatus;
+          ta.value = r.comentario;
+          paintStatus();
+          paintName();
+
+          // Edición: solo actualiza la vista previa y los indicadores (no re-dibuja, así no pierdes el foco)
+          nameIn.addEventListener('input', () => { r.nombre = nameIn.value; paintName(); renderPreview(); });
+          sel.addEventListener('change', () => { r.estatus = sel.value; paintStatus(); renderPreview(); });
+          ta.addEventListener('input', () => { r.comentario = ta.value; autoGrow(ta); renderPreview(); });
+
+          // Contraer / expandir
+          toggleBtn.addEventListener('click', () => {
+            const isCollapsed = el.classList.toggle('collapsed');
+            if (isCollapsed) collapsed.add(r); else collapsed.delete(r);
+            toggleBtn.setAttribute('aria-expanded', String(!isCollapsed));
+            if (!isCollapsed) autoGrow(ta);
+          });
+
+          // Acciones de la tarjeta
+          el.querySelectorAll<HTMLButtonElement>('.card-actions [data-a]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+              const a = btn.dataset.a!;
+              const idx = rows.indexOf(r);
+
+              if (a === 'del') {
+                rows.splice(idx, 1);
+                lastDeleted = { row: r, index: idx };
+                showNotice('Robot eliminado.');
+                renderForm();
+              } else if (a === 'dup') {
+                const copy = { ...r };
+                if (collapsed.has(r)) collapsed.add(copy);
+                rows.splice(idx + 1, 0, copy);
+                renderForm({ row: copy, a: 'nombre' });
+              } else if (a === 'up' && idx > 0) {
+                [rows[idx - 1], rows[idx]] = [rows[idx], rows[idx - 1]];
+                renderForm({ row: r, a });
+              } else if (a === 'down' && idx < rows.length - 1) {
+                [rows[idx + 1], rows[idx]] = [rows[idx], rows[idx + 1]];
+                renderForm({ row: r, a });
+              }
+              renderPreview();
+            });
+          });
+
+          rowsEl.appendChild(el);
+          autoGrow(ta);
+
+          // Devuelve el foco (y la vista) a la tarjeta que acaba de cambiar
+          if (focus && focus.row === r) {
+            let target: HTMLElement | null =
+              focus.a === 'nombre' ? nameIn : el.querySelector<HTMLButtonElement>(`[data-a="${focus.a}"]`);
+            if (target instanceof HTMLButtonElement && target.disabled) {
+              target = el.querySelector<HTMLButtonElement>(`[data-a="${focus.a === 'up' ? 'down' : 'up'}"]`);
+            }
+            target?.focus({ preventScroll: true });
+            el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          }
+        });
+      }
+
+      document.querySelector('#add')!.addEventListener('click', () => {
+        const r: Row = { nombre: '', estatus: 'Activo', comentario: '' };
+        rows.push(r);
+        renderForm({ row: r, a: 'nombre' });
+        renderPreview();
+      });
+
+      document.querySelector('#collapse-all')!.addEventListener('click', () => {
+        rows.forEach((r) => collapsed.add(r));
+        renderForm();
+      });
+      document.querySelector('#expand-all')!.addEventListener('click', () => {
+        rows.forEach((r) => collapsed.delete(r));
+        renderForm();
+      });
+
+      const tituloEl = document.querySelector<HTMLInputElement>('#titulo')!;
+      tituloEl.value = titulo;
+      tituloEl.addEventListener('input', () => {
+        titulo = tituloEl.value;
+        renderPreview();
+      });
+
+      // ---------- Texto superior / inferior ----------
+      const introEl = document.querySelector<HTMLTextAreaElement>('#intro')!;
+      const outroEl = document.querySelector<HTMLTextAreaElement>('#outro')!;
+      const introPrev = document.querySelector<HTMLElement>('#intro-preview')!;
+      const outroPrev = document.querySelector<HTMLElement>('#outro-preview')!;
+
+      const firstLine = (t: string) => t.split('\n').find((l) => l.trim())?.trim() ?? 'Vacío';
+
+      const syncTextBlocks = () => {
+        introEl.value = intro;
+        outroEl.value = outro;
+        introPrev.textContent = firstLine(intro);
+        outroPrev.textContent = firstLine(outro);
+        autoGrow(introEl);
+        autoGrow(outroEl);
+      };
+
+      introEl.addEventListener('input', () => {
+        intro = introEl.value;
+        introPrev.textContent = firstLine(intro);
+        autoGrow(introEl);
+        renderPreview();
+      });
+      outroEl.addEventListener('input', () => {
+        outro = outroEl.value;
+        outroPrev.textContent = firstLine(outro);
+        autoGrow(outroEl);
+        renderPreview();
+      });
+
+      // Al abrir un bloque, ajusta el alto del textarea (estando cerrado no se puede medir)
+      document.querySelectorAll<HTMLDetailsElement>('details.text-block').forEach((d) => {
+        d.addEventListener('toggle', () => {
+          if (d.open) autoGrow(d.querySelector('textarea')!);
+        });
+      });
+
+      syncTextBlocks();
+
+      // ---------- Copiar ----------
+      const flash = (t: string) => {
+        msgEl.textContent = t;
+        setTimeout(() => (msgEl.textContent = ''), 2500);
+      };
+
+      document.querySelector('#copy')!.addEventListener('click', async () => {
+        const html = buildHtml(rows);
+        const plain = [
+          intro.trim(),
+          ...rows.map((r, i) => `${i + 1}. ${r.nombre} - ${r.estatus}\n${r.comentario}`),
+          outro.trim(),
+        ]
+          .filter(Boolean)
+          .join('\n\n');
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({
+              'text/html': new Blob([html], { type: 'text/html' }),
+              'text/plain': new Blob([plain], { type: 'text/plain' }),
+            }),
+          ]);
+          flash('Copiado. Pega en Gmail con Ctrl+V.');
+        } catch {
+          flash('No se pudo copiar (necesita localhost o HTTPS).');
+        }
+      });
+
+      document.querySelector('#copy-code')!.addEventListener('click', async () => {
+        await navigator.clipboard.writeText(buildHtml(rows));
+        flash('Código HTML copiado.');
+      });
+
+      // ---------- Exportar / Importar ----------
+      document.querySelector('#export')!.addEventListener('click', () => {
+        const payload = { version: 1, titulo, intro, outro, robots: rows };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], {
+          type: 'application/json',
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `robots-${new Date().toISOString().slice(0, 10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        flash('Datos exportados.');
+      });
+
+      const fileInput = document.querySelector<HTMLInputElement>('#import-file')!;
+      document.querySelector('#import')!.addEventListener('click', () => fileInput.click());
+
+      fileInput.addEventListener('change', async () => {
+        const file = fileInput.files?.[0];
+        if (!file) return;
+        try {
+          const parsed = JSON.parse(await file.text());
+          const list = Array.isArray(parsed) ? parsed : parsed.robots;
+          if (!Array.isArray(list)) throw new Error('Formato inválido');
+
+          const imported: Row[] = list.map((r: any) => ({
+            nombre: String(r?.nombre ?? ''),
+            estatus: String(r?.estatus ?? 'Activo'),
+            comentario: String(r?.comentario ?? ''),
+          }));
+
+          // Si el archivo trae un estatus que no existe en la lista, lo agrega (color neutro)
+          imported.forEach((r) => {
+            if (!(r.estatus in ESTATUS)) ESTATUS[r.estatus] = '#333333';
+          });
+
+          if (rows.length && !confirm(`Esto reemplazará los ${rows.length} robots actuales. ¿Continuar?`)) return;
+
+          // Con listas largas, las tarjetas se cargan contraídas
+          if (imported.length > 5) imported.forEach((r) => collapsed.add(r));
+
+          if (!Array.isArray(parsed) && typeof parsed.titulo === 'string') {
+            titulo = parsed.titulo;
+            tituloEl.value = titulo;
+          }
+
+          // intro/outro: si el archivo no los trae (JSON antiguo), se conservan los actuales
+          if (!Array.isArray(parsed)) {
+            if (typeof parsed.intro === 'string') intro = parsed.intro;
+            if (typeof parsed.outro === 'string') outro = parsed.outro;
+            syncTextBlocks();
+          }
+
+          rows.splice(0, rows.length, ...imported);
+          renderForm();
+          renderPreview();
+          flash(`Importados ${imported.length} robots.`);
+        } catch {
+          flash('Archivo no válido. Usa un JSON exportado desde aquí.');
+        } finally {
+          fileInput.value = ''; // permite volver a importar el mismo archivo
+        }
+      });
+
+      renderForm();
+      renderPreview();
+    </script>
+  </body>
 </html>
