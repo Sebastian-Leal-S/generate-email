@@ -351,10 +351,10 @@ ${cell(539, '403.95', commentToHtml(r.comentario))}
           .join('\n');
 
         // Componente de tabla: título + encabezados + filas
-        const table = `<table border="0" cellspacing="0" cellpadding="0" width="1134" style="width:100%;font-family:Arial,sans-serif;font-size:13px;border-width:medium medium 4.5pt;border-style:none none solid;border-color:currentcolor currentcolor rgb(46,116,181)">
+        const table = `<table border="0" cellspacing="0" cellpadding="0" width="1134" style="width:100%;font-family:verdana,sans-serif;font-size:13px;border-width:medium medium 4.5pt;border-style:none none solid;border-color:currentcolor currentcolor rgb(46,116,181)">
 <tbody>
 <tr>
-<td colspan="4" valign="top" style="border-width:medium medium 4.5pt;border-style:none none solid;border-color:currentcolor currentcolor rgb(46,116,181);padding:8px;text-align:center"><b style="font-family:Arial,sans-serif;color:rgb(46,117,182);font-size:15px">${esc(titulo)}</b></td>
+<td colspan="4" valign="top" style="border-width:medium medium 4.5pt;border-style:none none solid;border-color:currentcolor currentcolor rgb(46,116,181);padding:8px;text-align:center"><b style="font-family:verdana,sans-serif;color:rgb(46,117,182);font-size:15px">${esc(titulo)}</b></td>
 </tr>
 <tr>
 <td width="52" style="width:39pt;${BORDER_ROW}"></td>
@@ -370,7 +370,7 @@ ${body}
         const textBlock = (t: string, margin: string) => {
           const inner = commentToHtml(t, 10);
           return inner
-            ? `<div style="font-family:Arial,sans-serif;font-size:13px;margin:${margin}">${inner}</div>`
+            ? `<div style="font-family:verdana,sans-serif;font-size:13px;margin:${margin}">${inner}</div>`
             : '';
         };
         const top = textBlock(intro, '0 0 6px');
